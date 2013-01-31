@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-namespace Elendev\CheckoutBundle;
+namespace GenCheckoutBundle;
 
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Elendev\CheckoutBundle\DependencyInjection\Compiler\CheckoutServicesLoaderPass;
+use GenCheckoutBundle\DependencyInjection\Compiler\CheckoutServicesLoaderPass;
 
 class ElendevCheckoutBundle extends Bundle
 {

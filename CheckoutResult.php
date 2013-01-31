@@ -14,9 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace Elendev\CheckoutBundle;
+namespace GenCheckoutBundle;
 
-use Elendev\CheckoutBundle\Command\Custommer;
+use GenCheckoutBundle\Command\Custommer;
 
 /**
  * Response returned by a checkout service on docheckout method call

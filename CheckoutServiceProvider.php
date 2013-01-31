@@ -14,10 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace Elendev\CheckoutBundle;
+namespace GenCheckoutBundle;
 
-use Elendev\CheckoutBundle\CheckoutService;
-use Elendev\CheckoutBundle\CheckoutProcessHandler;
+use GenCheckoutBundle\CheckoutService;
+use GenCheckoutBundle\CheckoutProcessHandler;
 /**
  * Contain and provide all checkout services available
  *

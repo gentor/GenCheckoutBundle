@@ -1,6 +1,6 @@
 <?php
 
-namespace Elendev\CheckoutBundle\Command;
+namespace GenCheckoutBundle\Command;
 
 
 interface OrderManagerService {

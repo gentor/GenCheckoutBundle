@@ -21,7 +21,7 @@ Load bundle on kernel :
     // in AppKernel::registerBundles()
     $bundles = array(
     	// ...
-    	new Elendev\CheckoutBundle\ElendevCheckoutBundle(),
+    	new GenCheckoutBundle\ElendevCheckoutBundle(),
     	// ...
 	);
 

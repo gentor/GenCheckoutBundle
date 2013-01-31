@@ -37,7 +37,7 @@ Here you can see a really simple implementation example :
  	
 	    public function doCheckoutAction($checkoutMethod){
 	 
-	        $command = ...; //instance of Elendev\CheckoutBundle\Command\Command
+	        $command = ...; //instance of GenCheckoutBundle\Command\Command
 	 
 	        $checkoutProvider = $this->get("elendev.checkout.service_provider")->getService($checkoutMethod);
  
@@ -71,13 +71,13 @@ Create a new service class
 This part explain how to add a new service to the CheckoutServiceProvider. This service will be available through the CheckoutServiceProvider->getService('id') method.
 
 - Creating a new service class
-To create a valid service class you need to extends the Elendev\CheckoutBundle\CheckoutService class. The simplest checkout service you can implement is visible below :
+To create a valid service class you need to extends the GenCheckoutBundle\CheckoutService class. The simplest checkout service you can implement is visible below :
 
 	namespace Your\Service\Namespace;
 	
-	use Elendev\CheckoutBundle\CheckoutService;
-	use Elendev\CheckoutBundle\Command\Command;
-	use Elendev\CheckoutBundle\CheckoutResult;
+	use GenCheckoutBundle\CheckoutService;
+	use GenCheckoutBundle\Command\Command;
+	use GenCheckoutBundle\CheckoutResult;
 
 	class SimpleCheckoutService extends CheckoutService {
 	    

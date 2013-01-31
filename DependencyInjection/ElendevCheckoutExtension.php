@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-namespace Elendev\CheckoutBundle\DependencyInjection;
+namespace GenCheckoutBundle\DependencyInjection;
 
 use Symfony\Component\HttpKernel\DependencyInjection\Extension;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

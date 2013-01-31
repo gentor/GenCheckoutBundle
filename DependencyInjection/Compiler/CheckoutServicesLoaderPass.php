@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-namespace Elendev\CheckoutBundle\DependencyInjection\Compiler;
+namespace GenCheckoutBundle\DependencyInjection\Compiler;
 
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

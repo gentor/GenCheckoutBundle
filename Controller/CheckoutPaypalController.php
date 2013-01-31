@@ -1,6 +1,6 @@
 <?php
 
-namespace Elendev\CheckoutBundle\Controller;
+namespace GenCheckoutBundle\Controller;
 
 $path = __DIR__ . "/../PaypalAPI/merchant-sdk/lib";
 set_include_path(get_include_path() . PATH_SEPARATOR . $path);

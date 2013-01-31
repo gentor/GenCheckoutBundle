@@ -14,13 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace Elendev\CheckoutBundle;
+namespace GenCheckoutBundle;
 
 
-use Elendev\CheckoutBundle\Command\Command;
+use GenCheckoutBundle\Command\Command;
 
 use Symfony\Component\HttpFoundation\Request;
-use Elendev\CheckoutBundle\CheckoutProcessHandler;
+use GenCheckoutBundle\CheckoutProcessHandler;
 /**
  * Represent a checkout service (like paypal checkout service or 
  * google checkout service)

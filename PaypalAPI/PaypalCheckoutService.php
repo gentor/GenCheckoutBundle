@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-namespace Elendev\CheckoutBundle\PaypalAPI;
+namespace GenCheckoutBundle\PaypalAPI;
 
 use Monolog\Logger;
 
@@ -26,15 +26,15 @@ include("services/PayPalAPIInterfaceService/PayPalAPIInterfaceServiceService.php
 
 use Symfony\Bundle\FrameworkBundle\Routing\Router;
 
-use Elendev\CheckoutBundle\Command\Custommer;
+use GenCheckoutBundle\Command\Custommer;
 
-use Elendev\CheckoutBundle\Command\Item;
+use GenCheckoutBundle\Command\Item;
 
-use Elendev\CheckoutBundle\CheckoutService;
-use Elendev\CheckoutBundle\Command\Command;
+use GenCheckoutBundle\CheckoutService;
+use GenCheckoutBundle\Command\Command;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Elendev\CheckoutBundle\CheckoutResult;
+use GenCheckoutBundle\CheckoutResult;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**

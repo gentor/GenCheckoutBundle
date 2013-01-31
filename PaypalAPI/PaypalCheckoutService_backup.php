@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-namespace Elendev\CheckoutBundle\PaypalAPI;
+namespace GenCheckoutBundle\PaypalAPI;
 
-use Elendev\CheckoutBundle\CheckoutService;
-use Elendev\CheckoutBundle\Command\Command;
+use GenCheckoutBundle\CheckoutService;
+use GenCheckoutBundle\Command\Command;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Elendev\CheckoutBundle\CheckoutResult;
+use GenCheckoutBundle\CheckoutResult;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 /**
  * Allow to do checkout through paypal

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace Elendev\CheckoutBundle\Command;
+namespace GenCheckoutBundle\Command;
 /**
  * Represent a command and have to be passed to the checkout service
  * to do a checkout.

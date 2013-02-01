@@ -20,7 +20,7 @@ namespace GenCheckoutBundle\PaypalAPI;
 use Monolog\Logger;
 
 //TODO : ADD IT IN PATH SYMFONY !
-$path = __DIR__ . "/merchant-sdk/lib";
+$path = __DIR__ . "/merchant-sdk-php/lib";
 set_include_path(get_include_path() . PATH_SEPARATOR . $path);
 include("services/PayPalAPIInterfaceService/PayPalAPIInterfaceServiceService.php");
 

@@ -44,7 +44,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  */
 class PaypalCheckoutService extends CheckoutService {
     //put your code here
-    
+    private $apiConfigPath;
     
     private $username;
     private $password;
@@ -115,12 +115,21 @@ class PaypalCheckoutService extends CheckoutService {
         
         if($useSandbox){
             //$this->endpoint = "https://api-3t.sandbox.paypal.com/2.0";
-            define('PP_CONFIG_PATH', __DIR__ . '/config/sandbox');
+            $this->apiConfigPath = __DIR__ . '/config/express-checkout/sandbox';
             $this->paypalURL = "https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&token=";
         }else{
             //$this->endpoint = "https://api-3t.paypal.com/2.0";
-        	define('PP_CONFIG_PATH', __DIR__ . '/config/production');
+            $this->apiConfigPath = __DIR__ . '/config/express-checkout/production';
             $this->paypalURL = "https://www.paypal.com/webscr&cmd=_express-checkout&token=";
+        }
+    }
+    
+    /**
+     * Set PP_CONFIG_PATH for PayPal API
+     */
+    public function setConfigPath(){
+        if (!defined('PP_CONFIG_PATH')) {
+            define('PP_CONFIG_PATH', $this->apiConfigPath);
         }
     }
     
@@ -131,7 +140,7 @@ class PaypalCheckoutService extends CheckoutService {
     public function setEndPoint($endPoint){
         $this->endpoint = $endPoint;
     }
-    
+
     /**
      * Paypal redirect url
      * @param type $paypalUrl 
@@ -145,8 +154,9 @@ class PaypalCheckoutService extends CheckoutService {
      * @param Command $command
      * @return CheckoutResult : result of checkout operations
      */
-    public function doCheckout(Command $command){
-    	
+    public function doCheckout(Command $command)
+    {
+        $this->setConfigPath();
         $token = $this->session->get("checkout.payment.token");
         
         $result = new CheckoutResult();

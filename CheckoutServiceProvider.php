@@ -17,7 +17,6 @@
 namespace GenCheckoutBundle;
 
 use GenCheckoutBundle\CheckoutService;
-use GenCheckoutBundle\CheckoutProcessHandler;
 /**
  * Contain and provide all checkout services available
  *
@@ -30,7 +29,7 @@ class CheckoutServiceProvider {
     private $services = array();
     
     
-    public function addService($id, CheckoutService $service){
+    public function addService($id, $service){
         $this->services[$id] = $service;
     }
     

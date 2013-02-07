@@ -31,4 +31,6 @@ interface Receiver {
     public function getInvoiceId();
     
     public function getPaymentType();
+
+    public function getItems();
 }

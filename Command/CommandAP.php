@@ -28,6 +28,8 @@ interface CommandAP {
     public function getReceiverList();
 
     public function getPreapprovalKey();
+
+    public function setPreapprovalKey($preapprovalKey);
     
 //    public function getCustommer();
 //    

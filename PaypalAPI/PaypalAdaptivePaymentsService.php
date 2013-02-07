@@ -24,11 +24,12 @@ $path = __DIR__ . "/merchant-sdk-php/lib";
 set_include_path(get_include_path() . PATH_SEPARATOR . $path);
 include("services/AdaptivePayments/AdaptivePaymentsService.php");
 
-use GenCheckoutBundle\Command\CommandAP;
 use Symfony\Bundle\FrameworkBundle\Routing\Router;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use GenCheckoutBundle\AdaptivePaymentsResult;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use GenCheckoutBundle\Command\CommandAP;
+use GenCheckoutBundle\Command\Item;
+use GenCheckoutBundle\AdaptivePaymentsResult;
 
 /**
  * Allow to do checkout through paypal
@@ -38,14 +39,15 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 class PaypalAdaptivePaymentsService {
     //put your code here
     private $apiConfigPath;
-    
+    private $requestEnvelope;
+
     private $username;
     private $password;
     private $signature;
 
     private $paypalURL;
     
-    private $currency = "EUR";
+    private $currency = "USD";
     
     private $currentUrl;
     
@@ -53,8 +55,6 @@ class PaypalAdaptivePaymentsService {
     
     private $cancelUrl;
     private $returnUrl;
-    
-    private $session;
     
     private $router;
     
@@ -71,11 +71,10 @@ class PaypalAdaptivePaymentsService {
         $this->username = $username;
         $this->password = $password;
         $this->signature = $signature;
+        $this->requestEnvelope = new \RequestEnvelope("en_US");
         
         $this->router = $router;
         $this->logger = $container->get("logger");
-        
-        $this->session = $container->get("session");
         
         $this->currentUrl = $container->get("request")->getUri();
         
@@ -84,10 +83,10 @@ class PaypalAdaptivePaymentsService {
         
         if($useSandbox){
             $this->apiConfigPath = __DIR__ . '/config/ap-payment/sandbox';
-            $this->paypalURL = "https://www.sandbox.paypal.com/webscr&cmd=_ap-payment&paykey=";
+            $this->paypalURL = "https://www.sandbox.paypal.com/webscr&";
         }else{
             $this->apiConfigPath = __DIR__ . '/config/ap-payment/production';
-            $this->paypalURL = "https://www.paypal.com/webscr&cmd=_ap-payment&paykey=";
+            $this->paypalURL = "https://www.paypal.com/webscr&";
         }
     }
     
@@ -110,103 +109,111 @@ class PaypalAdaptivePaymentsService {
     
     
     /**
-     * @param Command $command
+     * @param CommandAP $command
      * @return AdaptivePaymentsResult : result of adaptive payment operations
      */
-    public function doAdaptivePayment(CommandAP $command)
+    public function doPreapprovedAdaptivePayment(CommandAP $command)
     {
         $this->setConfigPath();
-    	
-        $paykey = $this->session->get("checkout.payment.paykey");
+        $this->setPaypalUrl($this->paypalURL . 'cmd=_ap-payment&paykey=');
         
         $result = new AdaptivePaymentsResult();
-        $result->setPaykey($paykey);
         
-        $paypalService = new \AdaptivePaymentsService();
+        try {
+            $response = $this->Pay($command, 'CREATE');
+            $result->setPaykey($response->payKey);
+            $result->setCommandData($response);
+            // Set status to ERROR, if it is not set later, this will be the final result
+            $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
+
+            if ($response->responseEnvelope->ack == 'Success') {
+                if ($response->paymentExecStatus == 'CREATED') {
+                    $response = $this->SetPaymentOptions($command, $result->getPaykey());
+                    $result->setCommandData($response);
+                    if ($response->responseEnvelope->ack == 'Success') {
+                        $response = $this->ExecutePayment($result->getPaykey());
+                        $result->setCommandData($response);
+                        if ($response->responseEnvelope->ack == 'Success' && 
+                            $response->paymentExecStatus == 'COMPLETED') {
+                            $response = $this->PaymentDetails($result->getPaykey());
+                            $result->setCommandData($response);
+                            if ($response->responseEnvelope->ack == 'Success' && 
+                                $response->status == 'COMPLETED') {
+                                $result->setStatus(AdaptivePaymentsResult::STATUS_SUCCESS);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch(\Exception $e) {
+            $this->logger->err('Command PAYPAL-AP PAY error : ' . $e->getCode() . " - " . $e->getMessage());
+            $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
+            throw $e;
+        }
+
+        return $result;
+    }
+    
+    /**
+     * @param CommandAP $command
+     * @return AdaptivePaymentsResult : result of adaptive payment operations
+     */
+    public function doPreApproval(CommandAP $command)
+    {
+        $this->setConfigPath();
+        $this->setPaypalUrl($this->paypalURL . 'cmd=_ap-preapproval&preapprovalkey=');
+        $this->returnUrl .= '&preapprovalkey=${preapprovalkey}';
+        $this->cancelUrl .= '&preapprovalkey=${preapprovalkey}';
         
-        if (!$paykey)
+        $preapprovalKey = $command->getPreapprovalKey();
+        
+        $result = new AdaptivePaymentsResult();
+        $result->setPreapprovalKey($preapprovalKey);
+        
+        if (!$preapprovalKey)
         {
-            //$response = $this->setExpressCheckoutRequest($command);
             try {
-            	$response = $this->Pay($command);
+            	$response = $this->PreApproval($command);
             	
             	$result->setCommandData($response);
-            	$result->setPaykey($response->payKey);
+            	$result->setPreapprovalKey($response->preapprovalKey);
             	
             	if ($response->responseEnvelope->ack == 'Success') {
-                    $this->session->set("checkout.payment.paykey", $response->payKey);
-
                     $result->setStatus(AdaptivePaymentsResult::STATUS_IN_PROGRESS);
-
-                    $result->setHttpResponse(new RedirectResponse($this->paypalURL . $response->payKey));
+                    $result->setHttpResponse(new RedirectResponse($this->paypalURL . $response->preapprovalKey));
             	} else {
-                    $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR); //TODO Check this !
-                    echo $response->error[0]->errorId;
+                    $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
             	}
-            	
             } catch(\Exception $e) {
-                $this->logger->err('Command PAYPAL-AP PAY error : ' . $e->getCode() . " - " . $e->getMessage());
-            	$this->session->remove("checkout.payment.paykey");
+                $this->logger->err('Command PAYPAL-AP PreApproval error : ' . $e->getCode() . " - " . $e->getMessage());
             	$result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
             	throw $e;
             }
-        return $result;    
-            
         } else {
-            	$this->session->remove("checkout.payment.paykey");
-exit;            
-            if($this->container->get("request")->query->get("status") == "continue"){
-                
-                $paykey = $this->session->get("checkout.payment.paykey");
-                
-                $ecDetails = null;
-                $ecPayment = null;
-                
-                try{
-                	$ecDetails = $this->getExpressCheckoutDetails($paykey);
-                	
-                	if($ecDetails->Ack == 'Success'){
-                		
-                		$ecPayment = $this->doExpressCheckout($command, $ecDetails->GetExpressCheckoutDetailsResponseDetails);
-                		
-                		if($ecPayment->Ack == 'Success'){
-                			$paymentInfo = $ecPayment->DoExpressCheckoutPaymentResponseDetails->PaymentInfo;
-                			if($paymentInfo && count($paymentInfo) > 0){
-                				$paymentStatus = $paymentInfo[0]->PaymentStatus;
-                				 
-                				if($paymentStatus == 'Completed' || $paymentStatus == 'Completed-Funds-Held'){
-                					$result->setStatus(CheckoutResult::STATUS_SUCCESS);
-                				}else if($paymentStatus == 'In-Progress' || $paymentStatus == 'Partially-Refunded' || $paymentStatus == 'Pending' || $paymentStatus == 'Processed'){
-                					$result->setStatus(CheckoutResult::STATUS_PENDING);
-                					$result->setCommandData($paymentInfo[0]->PendingReason);
-                				}else{
-                					$result->setStatus(CheckoutResult::STATUS_ERROR);
-                				}
-                			}else{ //simple success : need to check after if ok
-                				$result->setStatus(CheckoutResult::STATUS_PENDING);
-                			}
-                			
-                		}else{
-                			$this->logger->err('Command PAYPAL doExpressCheckoutPayment [' . $paykey . '] ack not success : ' . $ecPayment->Ack , array(json_encode($ecPayment)));
-                			$result->setStatus(CheckoutResult::STATUS_ERROR);
-                		}
-                	}else{
-                		$this->logger->err('Command PAYPAL getExpressCheckoutDetails [' . $paykey . '] ack not success : ' . $ecDetails->Ack , array(json_encode($ecDetails)));
-                		$result->setStatus(CheckoutResult::STATUS_ERROR); 
-                	}
-                }catch(\Exception $e){
-                	$this->session->remove("checkout.payment.paykey");
-                	$this->logger->err('Command PAYPAL [' . $paykey . '] get/do express checkout payment error : ' . $e->getCode() . " - " . $e->getMessage(), array("ecDetails" => json_encode($ecDetails), "ecPayment" => json_encode($ecPayment)));
-                	$result->setCommandData($e->getCode() . " - " . $e->getMessage());
-                	$result->setStatus(CheckoutResult::STATUS_ERROR);
-                }
-                
-                $this->session->remove("checkout.payment.paykey");
-            }else{
-                //Session delete checkout.payment.paykey
-                $this->session->remove("checkout.payment.paykey");
-                $result->setStatus(CheckoutResult::STATUS_CANCELED);
-                return $result;
+            try {
+            	$response = $this->PreApprovalDetails($command);
+            	$result->setCommandData($response);
+                // Set status to ERROR, if it is not set later, this will be the final result
+                $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
+            	
+            	if ($response->responseEnvelope->ack == 'Success') {
+                    if ($response->approved == 'true' && $response->status == 'ACTIVE') {
+                        $result->setStatus(AdaptivePaymentsResult::STATUS_SUCCESS);
+                    }
+                    if ($response->approved == 'false' && $response->status == 'ACTIVE') {
+                        $result->setStatus(AdaptivePaymentsResult::STATUS_PENDING);
+                        $result->setHttpResponse(
+                            new RedirectResponse($this->paypalURL . $result->getPreapprovalKey())
+                        );
+                    }
+                    if ($response->status == 'CANCELED' || $response->status == 'DEACTIVATED') {
+                        $result->setStatus(AdaptivePaymentsResult::STATUS_CANCELED);
+                    }
+            	}
+            } catch(\Exception $e) {
+                $this->logger->err('Command PAYPAL-AP PreApprovalDetails error : ' . $e->getCode() . " - " . $e->getMessage());
+            	$result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
+            	throw $e;
             }
         }
         
@@ -214,8 +221,45 @@ exit;
     }
     
     /**
+     * @param CommandAP $command
+     * @return AdaptivePaymentsResult : result of adaptive payment operations
+     */
+    public function checkPreApproval(CommandAP $command)
+    {
+        $this->setConfigPath();
+        
+        $result = new AdaptivePaymentsResult();
+        $result->setPreapprovalKey($command->getPreapprovalKey());
+        
+        try {
+            $response = $this->PreApprovalDetails($command);
+            $result->setCommandData($response);
+            // Set status to ERROR, if it is not set later, this will be the final result
+            $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
+
+            if ($response->responseEnvelope->ack == 'Success') {
+                if ($response->approved == 'true' && $response->status == 'ACTIVE') {
+                    $result->setStatus(AdaptivePaymentsResult::STATUS_SUCCESS);
+                }
+                if ($response->approved == 'false' && $response->status == 'ACTIVE') {
+                    $result->setStatus(AdaptivePaymentsResult::STATUS_PENDING);
+                }
+                if ($response->status == 'CANCELED' || $response->status == 'DEACTIVATED') {
+                    $result->setStatus(AdaptivePaymentsResult::STATUS_CANCELED);
+                }
+            }
+        } catch(\Exception $e) {
+            $this->logger->err('Command PAYPAL-AP PreApprovalDetails error : ' . $e->getCode() . " - " . $e->getMessage());
+            $result->setStatus(AdaptivePaymentsResult::STATUS_ERROR);
+            throw $e;
+        }
+        
+        return $result;
+    }
+    
+    /**
      * 
-     * @param Command $command
+     * @param CommandAP $command
      * @param string $action PAY or CREATE
      * @return \PayResponse
      */
@@ -223,7 +267,7 @@ exit;
     {
         $payRequest = new \PayRequest();
     	
-        $payRequest->requestEnvelope = new \RequestEnvelope("en_US");
+        $payRequest->requestEnvelope = $this->requestEnvelope;
         $payRequest->actionType = $action;
         $payRequest->cancelUrl = $this->cancelUrl;
         $payRequest->currencyCode = $this->currency;
@@ -231,10 +275,141 @@ exit;
         $payRequest->returnUrl = $this->returnUrl;
         $payRequest->senderEmail = $command->getSenderEmail();
         $payRequest->preapprovalKey = $command->getPreapprovalKey();
+        $payRequest->feesPayer = 'SENDER';
 
     	$paypalService = new \AdaptivePaymentsService();
     	
         return $paypalService->Pay($payRequest, $this->getAPICredentials());
+    }
+    
+    /**
+     * 
+     * @param CommandAP $command
+     * @param string $paykey Paykey received by Pay API call
+     * @return \SetPaymentOptionsResponse
+     */
+    public function SetPaymentOptions(CommandAP $command, $paykey)
+    {
+        $payRequest = new \SetPaymentOptionsRequest();
+        $payRequest->requestEnvelope = $this->requestEnvelope;
+        $payRequest->payKey = $paykey;
+
+        $receivers = $command->getReceiverList();
+        foreach ($receivers as $receiver) {
+            $receiverOptions = new \ReceiverOptions();
+            $receiverOptions->receiver = new \ReceiverIdentifier();
+            $receiverOptions->receiver->email = $receiver->getEmail();
+            $receiverOptions->invoiceData = new \InvoiceData();
+            foreach ($receiver->getItems() as $item) {
+                $receiverOptions->invoiceData->item[] = $this->getItemDetail($item);
+            }
+            $payRequest->receiverOptions[] = $receiverOptions;
+        }
+        
+        $paypalService = new \AdaptivePaymentsService();
+    	
+        return $paypalService->SetPaymentOptions($payRequest, $this->getAPICredentials());
+    }
+    
+    /**
+     * @param string $paykey Paykey received by Pay API call
+     * @return \PaymentDetailsResponse
+     */
+    public function PaymentDetails($paykey)
+    {
+        $payRequest = new \PaymentDetailsRequest();
+        $payRequest->requestEnvelope = $this->requestEnvelope;
+        $payRequest->payKey = $paykey;
+        
+        $paypalService = new \AdaptivePaymentsService();
+    	
+        return $paypalService->PaymentDetails($payRequest, $this->getAPICredentials());
+    }
+    
+    /**
+     * @param string $paykey Paykey received by Pay API call
+     * @return \ExecutePaymentResponse
+     */
+    public function ExecutePayment($paykey)
+    {
+        $payRequest = new \ExecutePaymentRequest();
+        $payRequest->requestEnvelope = $this->requestEnvelope;
+        $payRequest->payKey = $paykey;
+        
+        $paypalService = new \AdaptivePaymentsService();
+    	
+        return $paypalService->ExecutePayment($payRequest, $this->getAPICredentials());
+    }
+    
+    /**
+     * @return \InvoiceItem
+     */
+    private function getItemDetail(Item $item){
+    	$paypalItem = new \InvoiceItem();
+    	
+    	$paypalItem->name = $item->getName();
+    	$paypalItem->itemPrice = $item->getAmount();
+    	$paypalItem->itemCount = $item->getQuantity();
+    	
+    	return $paypalItem;
+    }
+    
+    /**
+     * 
+     * @param CommandAP $command
+     * @return \PreapprovalResponse
+     */
+    public function PreApproval(CommandAP $command)
+    {
+        $preapprovalRequest = new \PreapprovalRequest();
+    	
+        $preapprovalRequest->requestEnvelope = $this->requestEnvelope;
+        $preapprovalRequest->cancelUrl = $this->cancelUrl;
+        $preapprovalRequest->returnUrl = $this->returnUrl;
+        $preapprovalRequest->currencyCode = $this->currency;
+        $preapprovalRequest->startingDate = date('Y-m-d');
+        $preapprovalRequest->endingDate = date('Y-m-d', strtotime(date("Y-m-d", time()) . " + 1 day"));
+        $preapprovalRequest->senderEmail = $command->getSenderEmail();
+        $preapprovalRequest->feesPayer = 'SENDER';
+
+    	$paypalService = new \AdaptivePaymentsService();
+    	
+        return $paypalService->Preapproval($preapprovalRequest, $this->getAPICredentials());
+    }
+    
+    /**
+     * 
+     * @param CommandAP $command
+     * @return \PreapprovalDetailsResponse
+     */
+    public function PreApprovalDetails(CommandAP $command)
+    {
+        $preapprovalRequest = new \PreapprovalDetailsRequest();
+    	
+        $preapprovalRequest->requestEnvelope = $this->requestEnvelope;
+        $preapprovalRequest->preapprovalKey = $command->getPreapprovalKey();
+
+    	$paypalService = new \AdaptivePaymentsService();
+    	
+        return $paypalService->PreapprovalDetails($preapprovalRequest, $this->getAPICredentials());
+    }
+    
+    /**
+     * 
+     * @param CommandAP $command
+     * @return \CancelPreapprovalResponse
+     */
+    public function CancelPreApproval(CommandAP $command)
+    {
+        $this->setConfigPath();
+        $preapprovalRequest = new \CancelPreapprovalRequest();
+    	
+        $preapprovalRequest->requestEnvelope = $this->requestEnvelope;
+        $preapprovalRequest->preapprovalKey = $command->getPreapprovalKey();
+
+    	$paypalService = new \AdaptivePaymentsService();
+    	
+        return $paypalService->CancelPreapproval($preapprovalRequest, $this->getAPICredentials());
     }
     
     /**

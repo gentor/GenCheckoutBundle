@@ -25,11 +25,21 @@ class AdaptivePaymentsResult extends CheckoutResult
 {
     private $paykey;
     
+    private $preapprovalKey;
+    
     public function getPaykey(){
         return $this->paykey;
     }
 	
     public function setPaykey($paykey){
         $this->paykey = $paykey;
+    }
+
+    public function getPreapprovalKey(){
+        return $this->preapprovalKey;
+    }
+	
+    public function setPreapprovalKey($preapprovalKey){
+        $this->preapprovalKey = $preapprovalKey;
     }
 }

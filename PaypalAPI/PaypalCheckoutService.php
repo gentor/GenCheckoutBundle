@@ -50,7 +50,8 @@ class PaypalCheckoutService extends CheckoutService {
     private $password;
     private $signature;
 
-    private $payerId;
+    // Seller PayPal ID or Email
+    private $sellerId;
 
     //API URL
     private $endpoint;
@@ -66,8 +67,6 @@ class PaypalCheckoutService extends CheckoutService {
     
     private $cancelUrl;
     private $returnUrl;
-    
-    private $session;
     
     private $router;
     
@@ -105,8 +104,6 @@ class PaypalCheckoutService extends CheckoutService {
         
         $this->router = $router;
         $this->logger = $container->get("logger");
-        
-        $this->session = $container->get("session");
         
         $this->currentUrl = $container->get("request")->getUri();
         
@@ -157,92 +154,80 @@ class PaypalCheckoutService extends CheckoutService {
     public function doCheckout(Command $command)
     {
         $this->setConfigPath();
-        $token = $this->session->get("checkout.payment.token");
+
+        $token = $command->getToken();
         
         $result = new CheckoutResult();
         $result->setToken($token);
         
-        $paypalService = new \PayPalAPIInterfaceServiceService();
+//        $paypalService = new \PayPalAPIInterfaceServiceService();
         
-        
-        if(!$token){
+        if (!$token) {
             //$response = $this->setExpressCheckoutRequest($command);
-            try{
+            try {
             	$response = $this->setExpressCheckout($command);
             	
             	$result->setCommandData($response);
             	$result->setToken($response->Token);
             	
-            	if($response->Ack =='Success'){
-            		$this->session->set("checkout.payment.token", $response->Token);
-            	
-            		$result->setStatus(CheckoutResult::STATUS_IN_PROGRESS);
-            	
-            		$result->setHttpResponse(new RedirectResponse($this->paypalURL . $response->Token));
-            	}else{
-            		$result->setStatus(CheckoutResult::STATUS_ERROR); //TODO Check this !
+            	if ($response->Ack =='Success') {
+                    $result->setStatus(CheckoutResult::STATUS_IN_PROGRESS);
+
+                    $result->setHttpResponse(new RedirectResponse($this->paypalURL . $response->Token));
+            	} else {
+                    $result->setStatus(CheckoutResult::STATUS_ERROR); //TODO Check this !
             	}
             	
-            }catch(\Exception $e){
+            } catch(\Exception $e) {
             	$this->logger->err('Command PAYPAL setExpressCheckout error : ' . $e->getCode() . " - " . $e->getMessage());
-            	$this->session->remove("checkout.payment.token");
             	$result->setStatus(CheckoutResult::STATUS_ERROR);
             	throw $e;
             }
             
+        } else {
             
-        }else{
-            
-            if($this->container->get("request")->query->get("status") == "continue"){
-                
-                $token = $this->session->get("checkout.payment.token");
+            if ($this->container->get("request")->query->get("status") == "continue") {
                 
                 $ecDetails = null;
                 $ecPayment = null;
                 
-                try{
-                	$ecDetails = $this->getExpressCheckoutDetails($token);
-                	
-                	if($ecDetails->Ack == 'Success'){
-                		
-                		$ecPayment = $this->doExpressCheckout($command, $ecDetails->GetExpressCheckoutDetailsResponseDetails);
-                		
-                		if($ecPayment->Ack == 'Success'){
-                			$paymentInfo = $ecPayment->DoExpressCheckoutPaymentResponseDetails->PaymentInfo;
-                			if($paymentInfo && count($paymentInfo) > 0){
-                				$paymentStatus = $paymentInfo[0]->PaymentStatus;
-                				 
-                				if($paymentStatus == 'Completed' || $paymentStatus == 'Completed-Funds-Held'){
-                					$result->setStatus(CheckoutResult::STATUS_SUCCESS);
-                				}else if($paymentStatus == 'In-Progress' || $paymentStatus == 'Partially-Refunded' || $paymentStatus == 'Pending' || $paymentStatus == 'Processed'){
-                					$result->setStatus(CheckoutResult::STATUS_PENDING);
-                					$result->setCommandData($paymentInfo[0]->PendingReason);
-                				}else{
-                					$result->setStatus(CheckoutResult::STATUS_ERROR);
-                				}
-                			}else{ //simple success : need to check after if ok
-                				$result->setStatus(CheckoutResult::STATUS_PENDING);
-                			}
-                			
-                		}else{
-                			$this->logger->err('Command PAYPAL doExpressCheckoutPayment [' . $token . '] ack not success : ' . $ecPayment->Ack , array(json_encode($ecPayment)));
-                			$result->setStatus(CheckoutResult::STATUS_ERROR);
-                		}
-                	}else{
-                		$this->logger->err('Command PAYPAL getExpressCheckoutDetails [' . $token . '] ack not success : ' . $ecDetails->Ack , array(json_encode($ecDetails)));
-                		$result->setStatus(CheckoutResult::STATUS_ERROR); 
-                	}
-                }catch(\Exception $e){
-                	$this->session->remove("checkout.payment.token");
-                	$this->logger->err('Command PAYPAL [' . $token . '] get/do express checkout payment error : ' . $e->getCode() . " - " . $e->getMessage(), array("ecDetails" => json_encode($ecDetails), "ecPayment" => json_encode($ecPayment)));
-                	$result->setCommandData($e->getCode() . " - " . $e->getMessage());
-                	$result->setStatus(CheckoutResult::STATUS_ERROR);
+                try {
+                    $ecDetails = $this->getExpressCheckoutDetails($token);
+
+                    if ($ecDetails->Ack == 'Success') {
+                        $ecPayment = $this->doExpressCheckout($command, $ecDetails->GetExpressCheckoutDetailsResponseDetails);
+                        if ($ecPayment->Ack == 'Success') {
+                            $result->setCommandData($ecPayment);
+                            $paymentInfo = $ecPayment->DoExpressCheckoutPaymentResponseDetails->PaymentInfo;
+                            if ($paymentInfo && count($paymentInfo) > 0) {
+                                $paymentStatus = $paymentInfo[0]->PaymentStatus;
+
+                                if ($paymentStatus == 'Completed' || $paymentStatus == 'Completed-Funds-Held') {
+                                    $result->setStatus(CheckoutResult::STATUS_SUCCESS);
+                                } else if ($paymentStatus == 'In-Progress' || $paymentStatus == 'Partially-Refunded' || $paymentStatus == 'Pending' || $paymentStatus == 'Processed') {
+                                    $result->setStatus(CheckoutResult::STATUS_PENDING);
+                                    $result->setCommandData($paymentInfo[0]->PendingReason);
+                                } else {
+                                    $result->setStatus(CheckoutResult::STATUS_ERROR);
+                                }
+                            } else { //simple success : need to check after if ok
+                                $result->setStatus(CheckoutResult::STATUS_PENDING);
+                            }
+                        } else {
+                            $this->logger->err('Command PAYPAL doExpressCheckoutPayment [' . $token . '] ack not success : ' . $ecPayment->Ack , array(json_encode($ecPayment)));
+                            $result->setStatus(CheckoutResult::STATUS_ERROR);
+                        }
+                    } else {
+                        $this->logger->err('Command PAYPAL getExpressCheckoutDetails [' . $token . '] ack not success : ' . $ecDetails->Ack , array(json_encode($ecDetails)));
+                        $result->setStatus(CheckoutResult::STATUS_ERROR); 
+                    }
+                } catch(\Exception $e) {
+                    $this->logger->err('Command PAYPAL [' . $token . '] get/do express checkout payment error : ' . $e->getCode() . " - " . $e->getMessage(), array("ecDetails" => json_encode($ecDetails), "ecPayment" => json_encode($ecPayment)));
+                    $result->setCommandData($e->getCode() . " - " . $e->getMessage());
+                    $result->setStatus(CheckoutResult::STATUS_ERROR);
                 }
                 
-                $this->session->remove("checkout.payment.token");
-            }else{
-                //Session delete checkout.payment.token
-                $this->session->remove("checkout.payment.token");
+            } else {
                 $result->setStatus(CheckoutResult::STATUS_CANCELED);
                 return $result;
             }
@@ -346,7 +331,7 @@ class PaypalCheckoutService extends CheckoutService {
     	$paymentDetail->SellerDetails = $this->getSellerDetail();
     	
     	foreach($command->getItems() as $item){
-    		$paymentDetail->PaymentDetailsItem[] = $this->getItemDetail($item);
+            $paymentDetail->PaymentDetailsItem[] = $this->getItemDetail($item);
     	}
     	
     	$paymentDetail->NotifyURL = $this->router->generate("elendev.checkout.paypal.ipn", array('command' => $command->getId()), true);
@@ -382,8 +367,9 @@ class PaypalCheckoutService extends CheckoutService {
     	$amount->value = $item->getAmount();
     	$amount->currencyID = $this->currency;
     	
-    	$paypalItem->Name = $item->getName();
-    	$paypalItem->Description = $item->getDescription();
+    	$paypalItem->Name = trim($item->getName());
+        $paypalItem->Number = $item->getNumber();
+    	$paypalItem->Description = trim($item->getDescription());
     	$paypalItem->Amount = $amount;
     	$paypalItem->Quantity = $item->getQuantity();
     	
@@ -396,7 +382,9 @@ class PaypalCheckoutService extends CheckoutService {
     private function getSellerDetail(){
     	$sellerDetailType = new \SellerDetailsType();
     	
-    	$sellerDetailType->PayPalAccountID = $this->payerId;
+    	$sellerDetailType->PayPalAccountID = $this->sellerId;
+        
+        return $sellerDetailType;
     }
     
     /**
@@ -408,7 +396,11 @@ class PaypalCheckoutService extends CheckoutService {
     	return $apiCredentials;
     }
     
-    public function setCurrency($currency){
+    public function setSellerId($sellerId) {
+        $this->sellerId = $sellerId;
+    }
+    
+    public function setCurrency($currency) {
         $this->currency = $currency;
     }
     
@@ -435,7 +427,6 @@ class PaypalCheckoutService extends CheckoutService {
     public function setBrandName($brandName) {
         $this->brandName = $brandName;
     }
-
 
 }
 

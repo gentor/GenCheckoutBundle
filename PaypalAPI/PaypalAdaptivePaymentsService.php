@@ -47,7 +47,7 @@ class PaypalAdaptivePaymentsService {
 
     private $paypalURL;
     
-    private $currency = "USD";
+    private $currency = "EUR";
     
     private $currentUrl;
     
@@ -65,8 +65,9 @@ class PaypalAdaptivePaymentsService {
      * Receive the request object at initialization
      * @param ContainerInterface container
      */
-    public function __construct(ContainerInterface $container, Router $router, $username, $password, $signature, $useSandbox){
+    public function __construct(ContainerInterface $container, Router $router, $username, $password, $signature, $useSandbox, $currency){
         $this->container = $container;
+        $this->currency = $currency;
         
         $this->username = $username;
         $this->password = $password;

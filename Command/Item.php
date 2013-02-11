@@ -28,6 +28,8 @@ interface Item {
     
     public function getName();
     
+    public function getNumber();
+    
     public function getDescription();
     
     public function getAmount();

@@ -27,6 +27,8 @@ interface Command {
     //put your code here
     public function getId();
 	
+    public function setToken($token);
+    
     public function getToken();
     
     public function getCustommer();

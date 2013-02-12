@@ -38,7 +38,6 @@ use GenCheckoutBundle\AdaptivePaymentsResult;
  */
 class PaypalAdaptivePaymentsService {
     //put your code here
-    private $apiConfigPath;
     private $requestEnvelope;
 
     private $username;
@@ -82,22 +81,18 @@ class PaypalAdaptivePaymentsService {
         $this->cancelUrl = $this->currentUrl . "?status=cancel";
         $this->returnUrl = $this->currentUrl . "?status=continue";
         
-        if($useSandbox){
-            $this->apiConfigPath = __DIR__ . '/config/ap-payment/sandbox';
+        if ($useSandbox) {
+            if (!defined('PP_CONFIG_PATH')) {
+                define('PP_CONFIG_PATH', __DIR__ . '/config/sandbox');
+            }
             $this->paypalURL = "https://www.sandbox.paypal.com/webscr&";
-        }else{
-            $this->apiConfigPath = __DIR__ . '/config/ap-payment/production';
+        } else {
+            if (!defined('PP_CONFIG_PATH')) {
+                define('PP_CONFIG_PATH', __DIR__ . '/config/production');
+            }
             $this->paypalURL = "https://www.paypal.com/webscr&";
         }
-    }
-    
-    /**
-     * Set PP_CONFIG_PATH for PayPal API
-     */
-    public function setConfigPath(){
-        if (!defined('PP_CONFIG_PATH')) {
-            define('PP_CONFIG_PATH', $this->apiConfigPath);
-        }
+        set_time_limit(60);
     }
     
     /**
@@ -115,7 +110,6 @@ class PaypalAdaptivePaymentsService {
      */
     public function doPreapprovedAdaptivePayment(CommandAP $command)
     {
-        $this->setConfigPath();
         $this->setPaypalUrl($this->paypalURL . 'cmd=_ap-payment&paykey=');
         
         $result = new AdaptivePaymentsResult();
@@ -161,7 +155,6 @@ class PaypalAdaptivePaymentsService {
      */
     public function doPreApproval(CommandAP $command)
     {
-        $this->setConfigPath();
         $this->setPaypalUrl($this->paypalURL . 'cmd=_ap-preapproval&preapprovalkey=');
         $this->returnUrl .= '&preapprovalkey=${preapprovalkey}';
         $this->cancelUrl .= '&preapprovalkey=${preapprovalkey}';
@@ -227,8 +220,6 @@ class PaypalAdaptivePaymentsService {
      */
     public function checkPreApproval(CommandAP $command)
     {
-        $this->setConfigPath();
-        
         $result = new AdaptivePaymentsResult();
         $result->setPreapprovalKey($command->getPreapprovalKey());
         
@@ -240,7 +231,12 @@ class PaypalAdaptivePaymentsService {
 
             if ($response->responseEnvelope->ack == 'Success') {
                 if ($response->approved == 'true' && $response->status == 'ACTIVE') {
-                    $result->setStatus(AdaptivePaymentsResult::STATUS_SUCCESS);
+                    if ( strtotime($response->endingDate) < time() ) {
+                        // Expired
+                        $result->setStatus(AdaptivePaymentsResult::STATUS_CANCELED);
+                    } else {
+                        $result->setStatus(AdaptivePaymentsResult::STATUS_SUCCESS);
+                    }
                 }
                 if ($response->approved == 'false' && $response->status == 'ACTIVE') {
                     $result->setStatus(AdaptivePaymentsResult::STATUS_PENDING);
@@ -402,7 +398,6 @@ class PaypalAdaptivePaymentsService {
      */
     public function CancelPreApproval(CommandAP $command)
     {
-        $this->setConfigPath();
         $preapprovalRequest = new \CancelPreapprovalRequest();
     	
         $preapprovalRequest->requestEnvelope = $this->requestEnvelope;

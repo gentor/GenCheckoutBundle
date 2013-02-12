@@ -44,7 +44,6 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
  */
 class PaypalCheckoutService extends CheckoutService {
     //put your code here
-    private $apiConfigPath;
     
     private $username;
     private $password;
@@ -110,24 +109,18 @@ class PaypalCheckoutService extends CheckoutService {
         $this->cancelUrl = $this->currentUrl . "?status=cancel";
         $this->returnUrl = $this->currentUrl . "?status=continue";
         
-        if($useSandbox){
-            //$this->endpoint = "https://api-3t.sandbox.paypal.com/2.0";
-            $this->apiConfigPath = __DIR__ . '/config/express-checkout/sandbox';
+        if ($useSandbox) {
+            if (!defined('PP_CONFIG_PATH')) {
+                define('PP_CONFIG_PATH', __DIR__ . '/config/sandbox');
+            }
             $this->paypalURL = "https://www.sandbox.paypal.com/webscr&cmd=_express-checkout&token=";
-        }else{
-            //$this->endpoint = "https://api-3t.paypal.com/2.0";
-            $this->apiConfigPath = __DIR__ . '/config/express-checkout/production';
+        } else {
+            if (!defined('PP_CONFIG_PATH')) {
+                define('PP_CONFIG_PATH', __DIR__ . '/config/production');
+            }
             $this->paypalURL = "https://www.paypal.com/webscr&cmd=_express-checkout&token=";
         }
-    }
-    
-    /**
-     * Set PP_CONFIG_PATH for PayPal API
-     */
-    public function setConfigPath(){
-        if (!defined('PP_CONFIG_PATH')) {
-            define('PP_CONFIG_PATH', $this->apiConfigPath);
-        }
+        set_time_limit(60);
     }
     
     /**
@@ -153,8 +146,6 @@ class PaypalCheckoutService extends CheckoutService {
      */
     public function doCheckout(Command $command)
     {
-        $this->setConfigPath();
-
         $token = $command->getToken();
         
         $result = new CheckoutResult();

@@ -419,7 +419,7 @@ class PaypalAdaptivePaymentsService {
         for ($i = 0; $i < count($list); $i++) {
             $receiver[$i] = new \Receiver();
             $receiver[$i]->email = $list[$i]->getEmail();
-            $receiver[$i]->amount = $list[$i]->getAmount();
+            $receiver[$i]->amount = round($list[$i]->getAmount(), 2);
             $receiver[$i]->primary = $list[$i]->isPrimary();
             $receiver[$i]->invoiceId = $list[$i]->getInvoiceId();
             $receiver[$i]->paymentType = $list[$i]->getPaymentType();

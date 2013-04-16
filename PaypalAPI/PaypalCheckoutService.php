@@ -197,7 +197,7 @@ class PaypalCheckoutService extends CheckoutService {
                                     $result->setStatus(CheckoutResult::STATUS_SUCCESS);
                                 } else if ($paymentStatus == 'In-Progress' || $paymentStatus == 'Partially-Refunded' || $paymentStatus == 'Pending' || $paymentStatus == 'Processed') {
                                     $result->setStatus(CheckoutResult::STATUS_PENDING);
-                                    $result->setCommandData($paymentInfo[0]->PendingReason);
+//                                    $result->setCommandData($paymentInfo[0]->PendingReason);
                                 } else {
                                     $result->setStatus(CheckoutResult::STATUS_ERROR);
                                 }
